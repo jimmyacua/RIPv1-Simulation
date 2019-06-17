@@ -46,9 +46,6 @@ class Client:
             router = Router(i, ip, '255.255.255.0', neighborhood, my_socket)
             routers.append(router)
 
-            #buffer size 1024
-            #response = my_socket.recvfrom(1024)
-            #print(response)
         global connections
         connections = {'r1-s1':'10.0.1.1', 'r2-s2':'10.0.3.1',
                        'r4-s4': '10.0.2.1', 'r5-s5': '10.0.4.1',
@@ -70,7 +67,8 @@ class Client:
         listaRouters[4].addSubNet(4)
         #listaRouters[0].printRoutingTable()
 
-        for i in range(5):
+        iter = 0
+        while True:
             #R1
             self.rip(listaRouters[0], listaRouters[2])
             #print(listaRouters[2].getRouterTable())
@@ -81,28 +79,48 @@ class Client:
             #time.sleep(10)
             #R3
             self.rip(listaRouters[2], listaRouters[0])
+            #time.sleep(10)
             self.rip(listaRouters[2], listaRouters[1])
+            #time.sleep(10)
             self.rip(listaRouters[2], listaRouters[3])
+            #time.sleep(10)
             self.rip(listaRouters[2], listaRouters[4])
             #time.sleep(10)
 
             #R4
             self.rip(listaRouters[3], listaRouters[2])
+            #time.sleep(10)
             self.rip(listaRouters[3], listaRouters[4])
             #time.sleep(10)
 
             #R5
             self.rip(listaRouters[4], listaRouters[2])
+            #time.sleep(10)
             self.rip(listaRouters[4], listaRouters[3])
+            #time.sleep(10)
+
+            for i in range(5):
+                listaRouters[i].printAndSetRoutingTable()
 
             print('--------------------------------------------------------------------------------------------------')
-            #time.sleep(10)
+            time.sleep(10)
+
+            iter += 1
+            '''if(iter == 6):
+                listaRouters[2] = None
+                listaRouters[2] = listaRouters[3]
+                listaRouters[3] = listaRouters[4]'''
+
+
+
 
             #time.sleep(10)
 
         print('FINAL ROUTING TABLES')
         for i in range(5):
-            listaRouters[i].printRoutingTable()
+            listaRouters[i].printAndSetRoutingTable()
+
+
 
     def rip(self, r1, r2):
         global connections
@@ -119,23 +137,43 @@ class Client:
                         addr = "r" + str(r2.id) + '-' + "r" + str(r2.next_hop[i])
 
                     #r2.setRouterTable([r2.getRouterTable()] + [listSubredes[str(i + 1)].ipAddress, r2.next_hop[i], connections[addr], r2.num_hops[i]])
-        r2.getSocket().sendto(str(r2.getRouterTable()).encode() + ', src:'.encode()+str(r1.getID()).encode()+', dest:'.encode()+str(r2.getID()).encode(), ('localhost', 8000))
+
         #print(str(r2.getRouterTable()).encode() + ', src:'.encode()+str(r1.getID()).encode()+', dest:'.encode()+str(r2.getID()).encode(), ('localhost', 8000))
-        #r2.printRoutingTable()
+        r2.printAndSetRoutingTable()
+        r2.getSocket().sendto(str(r2.getRouterTable()).encode() + ', src:'.encode() + str(r1.getID()).encode() + ', dest:'.encode() + str(
+                r2.getID()).encode(), ('localhost', 8000))
+
+        #print(r2.getNeighborhood())
+        # buffer size 1024
+        response = r2.getSocket().recvfrom(1024)
+        #print("response: ", response)
+        #print(r1.getID())
+        global listaRouters
+        for r in range(5):
+            try:
+                #print(r)
+                if r != r1.getID()-1:
+                    listaRouters[r].getNeighborhood().index(r2.getID()) #if is a neighbour
+                    listaRouters[r].table[r1.getID()] = r2.table[r1.getID()]
+                    #print(r, listaRouters[r].getRouterTable()[r1.getID()])
+
+            except:
+                pass
+                #print("no")
 
 
 
 class Router():
-    def __init__(self, i, newIp, mas, neighbor, sock):
+    def __init__(self, i, newIp, mas, neighbour, sock):
         self.id = i
         self.ip = newIp
         self.mask = mas
-        self.neighborhood = neighbor
+        self.neighborhood = neighbour
         self.my_socket = sock
         self.dest_network = [16] * 5
         self.next_hop = [16] * 5
         self.num_hops = [16] * 5
-        self.table = [0]*4, [0]*0
+        self.table = [[0 for x in range(5)] for y in range(5)]
 
     def getInfo(self):
         return [self.id, self.ip, self.mask, self.neighborhood, self.my_socket]
@@ -152,19 +190,14 @@ class Router():
     def getSocket(self):
         return self.my_socket
 
-    def setRouterTable(self, myTable):
-        for i in range(4):
-            for j in range(4):
-                self.table[i][j] = myTable[i][j]
-
-
     def getRouterTable(self):
         return self.table
 
-    def printRoutingTable(self):
+    def printAndSetRoutingTable(self):
         print('Routing table of R' + str(self.id))
-        print('Destination | Next hop |   address     | Number of hops')
+        print('Destination | Next hop | address | Number of hops')
 
+        my_table2 = ""
         global listSubredes, connections
         for i in range(5):
             addr = ""
@@ -174,12 +207,17 @@ class Router():
                 addr = "r"+str(self.id)+'-'+"r"+str(self.next_hop[i])
 
             #self.table = [listSubredes[str(i+1)].ipAddress, self.next_hop[i], connections.get(addr),self.num_hops[i]]
-            '''self.table[0][0] = listSubredes[str(i+1)].ipAddress
-            self.table[0][1] = self.next_hop[i]
-            self.table[0][2] = connections.get(addr)
-            self.table[0][2] = self.num_hops[i]
-            print(self.table)'''
-            print(listSubredes[str(i+1)].ipAddress, '   |    ', self.next_hop[i],  '   |',  connections.get(addr), ' |', self.num_hops[i])
+
+            my_table2 = my_table2 + str(listSubredes[str(i+1)].ipAddress) + ", " + str(self.next_hop[i])+ ", "  + str(connections.get(addr))+ ", "  + str(self.num_hops[i])+ '\n'
+        #print(my_table2)
+            #print(listSubredes[str(i+1)].ipAddress, '   |    ', self.next_hop[i],  '   |',  connections.get(addr), ' |', self.num_hops[i])
+
+        temp = my_table2.split('\n')
+        for i in range(5):
+            self.table[i] = temp[i]
+
+        for i in range(5):
+            print(self.table[i])
 
     def addSubNet(self, i):
         self.dest_network.insert(i, 0)

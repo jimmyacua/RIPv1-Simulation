@@ -99,17 +99,22 @@ class Client:
             self.rip(listaRouters[4], listaRouters[3])
             #time.sleep(10)
 
-            for i in range(5):
-                listaRouters[i].printAndSetRoutingTable()
+            try:
+                for i in range(5):
+                    listaRouters[i].printAndSetRoutingTable()
+            except:
+                pass
 
             print('--------------------------------------------------------------------------------------------------')
-            time.sleep(10)
-
             iter += 1
-            '''if(iter == 6):
-                listaRouters[2] = None
-                listaRouters[2] = listaRouters[3]
-                listaRouters[3] = listaRouters[4]'''
+            if (iter == 6):
+                print("Router 3 is out")
+                listaRouters[2].setStatus(0)
+
+            time.sleep(2)
+
+
+
 
 
 
@@ -123,43 +128,70 @@ class Client:
 
 
     def rip(self, r1, r2):
-        global connections
-        for i in range(5):
-           if(r1.dest_network[i] != 16):
-                if(r2.dest_network[i] > r1.dest_network[i] or r2.dest_network[i] == 16 ):
-                    r2.dest_network[i] = r1.dest_network[i]+1
-                    r2.next_hop[i] = str(r1.getID())
-                    r2.num_hops[i] = r1.dest_network[i]+1
-                    addr = ""
-                    if 0 == r2.next_hop[i]:
-                        addr = "r" + str(r2.id) + '-' + "s" + str(r2.id)
-                    else:
-                        addr = "r" + str(r2.id) + '-' + "r" + str(r2.next_hop[i])
-
-                    #r2.setRouterTable([r2.getRouterTable()] + [listSubredes[str(i + 1)].ipAddress, r2.next_hop[i], connections[addr], r2.num_hops[i]])
-
-        #print(str(r2.getRouterTable()).encode() + ', src:'.encode()+str(r1.getID()).encode()+', dest:'.encode()+str(r2.getID()).encode(), ('localhost', 8000))
-        r2.printAndSetRoutingTable()
-        r2.getSocket().sendto(str(r2.getRouterTable()).encode() + ', src:'.encode() + str(r1.getID()).encode() + ', dest:'.encode() + str(
-                r2.getID()).encode(), ('localhost', 8000))
-
-        #print(r2.getNeighborhood())
-        # buffer size 1024
-        response = r2.getSocket().recvfrom(1024)
-        #print("response: ", response)
-        #print(r1.getID())
         global listaRouters
-        for r in range(5):
-            try:
-                #print(r)
-                if r != r1.getID()-1:
-                    listaRouters[r].getNeighborhood().index(r2.getID()) #if is a neighbour
-                    listaRouters[r].table[r1.getID()] = r2.table[r1.getID()]
-                    #print(r, listaRouters[r].getRouterTable()[r1.getID()])
+        if r2.up == 0:
+            r1.dest_network[r2.getID() - 1] = "unreacheable"
+            r1.next_hop[r2.getID() - 1] = "unreacheable"
+            r1.num_hops[r2.getID() - 1] = 16
+            for r in range(5):
+                try:
+                    if listaRouters[r].getNeighborhood().index(r):
+                        listaRouters[r].dest_network[r2.getID()-1] = "unreacheable"
+                        listaRouters[r].next_hop[r2.getID()-1] = "unreacheable"
+                        listaRouters[r].num_hops[r2.getID()-1] = 16
+                except:
+                    pass
 
-            except:
-                pass
-                #print("no")
+        elif r1.up == 0:
+            r2.dest_network[r1.getID() - 1] = "unreacheable"
+            r2.next_hop[r1.getID() - 1] = "unreacheable"
+            r2.num_hops[r1.getID() - 1] = 16
+            for r in range(5):
+                try:
+                    if listaRouters[r].getNeighborhood().index(r):
+                        listaRouters[r].dest_network[r1.getID()-1] = "unreacheable"
+                        listaRouters[r].next_hop[r1.getID()-1] = "unreacheable"
+                        listaRouters[r].num_hops[r1.getID()-1] = 16
+                except:
+                    pass
+        else:
+            global connections
+            for i in range(5):
+               if(r1.dest_network[i] != 2):
+                    if(r2.dest_network[i] > r1.dest_network[i] or r2.dest_network[i] == 16 ):
+                        if(listaRouters[2].up != 0):
+                            r2.dest_network[i] = r1.dest_network[i]+1
+                            addr = ""
+                            if(listaRouters[r1.getID()-1].up == 1):
+                                r2.next_hop[i] = str(r1.getID())
+                                r2.num_hops[i] = r1.dest_network[i]+1
+                                if 0 == r2.next_hop[i]:
+                                    addr = "r" + str(r2.id) + '-' + "s" + str(r2.id)
+                                else:
+                                    addr = "r" + str(r2.id) + '-' + "r" + str(r2.next_hop[i])
+                            else:
+                                r2.next_hop[i] = "unreacheable"
+                                r2.num_hops[i] = 16
+                                addr = "unreacheable"
+
+            r2.printAndSetRoutingTable()
+            r2.getSocket().sendto(str(r2.getRouterTable()).encode() + ', src:'.encode() + str(r1.getID()).encode() + ', dest:'.encode() + str(
+                    r2.getID()).encode(), ('localhost', 8000))
+
+            # buffer size 1024
+            response = r2.getSocket().recvfrom(1024)
+            #print("response: ", response)
+            for r in range(5):
+                try:
+                    #print(r)
+                    if r != r1.getID()-1:
+                        listaRouters[r].getNeighborhood().index(r2.getID()) #if is a neighbour
+                        listaRouters[r].table[r1.getID()] = r2.table[r1.getID()]
+                        #print(r, listaRouters[r].getRouterTable()[r1.getID()])
+
+                except:
+                    pass
+                    #print("no")
 
 
 
@@ -174,6 +206,7 @@ class Router():
         self.next_hop = [16] * 5
         self.num_hops = [16] * 5
         self.table = [[0 for x in range(5)] for y in range(5)]
+        self.up = 1 #up == 1, down == 0
 
     def getInfo(self):
         return [self.id, self.ip, self.mask, self.neighborhood, self.my_socket]
@@ -223,6 +256,9 @@ class Router():
         self.dest_network.insert(i, 0)
         self.next_hop.insert(i, 0)
         self.num_hops.insert(i, 0)
+
+    def setStatus(self, status):
+        self.up = status
 
 
 

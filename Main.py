@@ -12,7 +12,7 @@ timeout = 20
 
 r1 = Router(1, ["192.168.0.1"], [["192.168.0.2",3,2]])
 r2 = Router(2, ["192.168.0.12"], [["192.168.0.18",3,2]])
-r3 = Router(3, ["192.168.0.12", "192.168.0.5", "192.168.0.18", "192.168.0.13"], [["192.168.0.1",1,2], ["192.168.0.12",2,2], ["192.168.0.6",4,2], ["192.168.0.14",5,2]])
+r3 = Router(3, ["192.168.0.2", "192.168.0.5", "192.168.0.18", "192.168.0.13"], [["192.168.0.1",1,2], ["192.168.0.12",2,2], ["192.168.0.6",4,2], ["192.168.0.14",5,2]])
 r4 = Router(4, ["192.168.0.6", "192.168.0.9"], [["192.168.0.5",3,2], ["192.168.0.10",5,2]])
 r5 = Router(5, ["192.168.0.10", "192.168.0.14"], [["192.168.0.13",3,2], ["192.168.0.9",4,2]])
 
@@ -60,14 +60,17 @@ def sendRequest(router):
     #print("sending request packet")
     message = str(router.getID()) + ", " + str(outPorts) + "REQUEST"
     for (outPort, outRouterID, numHops) in outPorts:
+        lock.acquire()
         outsocket.sendto(message.encode(), ('127.0.0.1', 8000+int(outPort[10])))
+        #print("sendREq", 8000+int(outPort[10]))
+        lock.release()
 
     #print("end sending request packet")
 
 def sendUpdate(router, target = None):
-    #print("send Update")
     outPorts = router.getOutputPorts()
     for (outPort, outRouterID, numHops) in outPorts:
+        #print(outPort, outRouterID, numHops)
         if target == None or target == outRouterID:
             outRoutes = []
             for r in router.getTable().getRoutes():
@@ -78,8 +81,9 @@ def sendUpdate(router, target = None):
                     outRoutes.append(r)
 
                 message = str(router.getID()) + "," + str(outRoutes) + "," + "UPDATE"
+                lock.acquire()
                 outsocket.sendto(message.encode(), ('127.0.0.1', 8000+int(outPort[10])))
-    #print("send Update finish")
+                lock.release()
 
 def getOutputPortTo(router, dest):
     outPorts = router.getOutputPorts()
@@ -98,59 +102,69 @@ def getHopsTo(router, dest):
 lock = threading.Lock()
 
 def rip(router):
-    #lock.acquire()
-    for o in router.getOutputPorts():
-        #print(o[0][10])
+    for port in router.getInputPorts():
+        portSplit = str(port).split(".")
+        lock.acquire()
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(('127.0.0.1', 8000+int(o[0][10])))
+        #print(port, port[10])
         inputSockets.append(sock)
+        #print(8000 + int(port[10]))
+        sock.bind(('127.0.0.1', 8000+int(portSplit[3])))
+        #print("binded")
+        lock.release()
 
-
-    #print("Routing Table of router", router.getID())
-    #router.getTable().printTable()
 
     sendRequest(router)
+    #print("sale sendReq")
 
-    #while True:
-    sendUpdate(router)
-    startTime = time.time()
-    blockduration = 0
+    while True:
+        sendUpdate(router)
+        #print("sale sedUpda")
+        startTime = time.time()
+        blockduration = 0
 
-    while blockduration < updatePeriod:
-        inputs = inputSockets
-        updateRequired = False
+        while blockduration < updatePeriod:
+            inputs = inputSockets
+            updateRequired = False
 
-        for insock in inputs:
-            message = insock.recv(1024)
-            #print(message[1])
-            messageString = str(message)
-            #print("REQUEST" in messageString)
-            if "REQUEST" in messageString:
-                #print("REQUEST RECEIVED FROM", messageString[2])
-                    sendUpdate(router,  messageString[2])
-            else:
-                outP = routers[int(messageString[2])-1].getOutputPorts()
-                for route in outP:
-                    #newOutPort = getOutputPortTo(routers[int(message[2]-1)])
-                    #print("ruta", route)
-                    newOutPort = getOutputPortTo(router, routers[route[1] -1])
-                    newNumHops = min(int(route[2]) + int(getHopsTo(router, routers[route[2]])),  16)
-                    route = Routes(router.getID(), route[1], newOutPort, newNumHops)
-                    #print("ruta", route.dest, , route.numHops)
+            for insock in inputs:
+                message = insock.recv(1024)
+                #print(message[1])
+                messageString = str(message)
+                message = messageString.split(",")
+                #print(message[0])
+                #print(len(message[0]))
+                if "REQUEST" in messageString:
+                    #print("REQUEST RECEIVED FROM", messageString[2])
+                        sendUpdate(router,  messageString[2])
+                else:
+                    #print(messageString)
+                    #print("AQUI", messageString[0])
+                    r = 0
+                    if len(message[0]) != 1:
+                        r = 2
+                    outP = routers[(int(message[0][r]))-1].getOutputPorts()
+                    for route in outP:
+                        #newOutPort = getOutputPortTo(routers[int(message[2]-1)])
+                        #print("ruta", route)
+                        newOutPort = getOutputPortTo(router, routers[route[1] -1])
+                        newNumHops = min(int(route[2]) + int(getHopsTo(router, routers[route[2]])),  16)
+                        route = Routes(router.getID(), route[1], newOutPort, newNumHops)
+                        #print("ruta", route.dest, , route.numHops)
 
-                    router.getTable().processRoute(route)
+                        router.getTable().processRoute(route)
 
-            #router.getTable().printTable()
+                #router.getTable().printTable()
 
 
-        blockduration = time.time() - startTime
-        for i in routers:
-            print("Routing table of router", i.getID())
-            i.getTable().printTable()
-        time.sleep(10)
-        #lock.release()
+            blockduration = time.time() - startTime
 
-        #time.sleep(10)
+            print("Routing table of router", router.getID())
+            router.getTable().printTable()
+            time.sleep(10)
+            #lock.release()
+
+            #time.sleep(10)
 
 
 class myThread(threading.Thread):
@@ -168,14 +182,15 @@ class myThread(threading.Thread):
         # threadLock.release()
 
 if __name__ == "__main__":
-    '''r = input("router?")
+    '''r = input("router?\n")
     rip(routers[int(r)-1])'''
-    rip(r1)
-    rip(r2)
-    rip(r3)
-    rip(r4)
-    rip(r5)
-    '''t1 = myThread(r1)
+    #rip(r1)
+    #rip(r2)
+    #rip(r3)
+    #rip(r4)
+    #rip(r5)
+
+    t1 = myThread(r1)
     t2 = myThread(r2)
     t3 = myThread(r3)
     t4 = myThread(r4)
@@ -195,11 +210,11 @@ if __name__ == "__main__":
     t4.start()
     t5.start()
 
-    for t in threads:
-        t.join()'''
+    #for t in threads:
+      #  t.join()
 
-    outsocket.close()
-    for soc in inputSockets:
-        soc.close()
+    #outsocket.close()
+    #for soc in inputSockets:
+     #   soc.close()
 
 

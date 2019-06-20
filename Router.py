@@ -26,3 +26,6 @@ class Router:
 
     def getOutputPorts(self):
         return self.outputPorts
+
+    def getInputPorts(self):
+        return self.inputPorts

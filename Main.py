@@ -60,16 +60,19 @@ def sendRequest(router):
     #print("sending request packet")
     message = str(router.getID()) + ", " + str(outPorts) + "REQUEST"
     for (outPort, outRouterID, numHops) in outPorts:
-        lock.acquire()
-        outsocket.sendto(message.encode(), ('127.0.0.1', 8000+int(outPort[10])))
+        p = str(outPort).split(".")
+        #print(p)
+        #lock.acquire()
+        outsocket.sendto(message.encode(), ('127.0.0.1', 8000+int(p[3])))
         #print("sendREq", 8000+int(outPort[10]))
-        lock.release()
+        #lock.release()
 
     #print("end sending request packet")
 
 def sendUpdate(router, target = None):
     outPorts = router.getOutputPorts()
     for (outPort, outRouterID, numHops) in outPorts:
+        p = str(outPort).split(".")
         #print(outPort, outRouterID, numHops)
         if target == None or target == outRouterID:
             outRoutes = []
@@ -81,9 +84,9 @@ def sendUpdate(router, target = None):
                     outRoutes.append(r)
 
                 message = str(router.getID()) + "," + str(outRoutes) + "," + "UPDATE"
-                lock.acquire()
-                outsocket.sendto(message.encode(), ('127.0.0.1', 8000+int(outPort[10])))
-                lock.release()
+                #lock.acquire()
+                outsocket.sendto(message.encode(), ('127.0.0.1', 8000+int(p[3])))
+                #lock.release()
 
 def getOutputPortTo(router, dest):
     outPorts = router.getOutputPorts()
@@ -99,19 +102,19 @@ def getHopsTo(router, dest):
             return numHops
     return 16
 
-lock = threading.Lock()
+#lock = threading.#lock()
 
 def rip(router):
     for port in router.getInputPorts():
         portSplit = str(port).split(".")
-        lock.acquire()
+        #lock.acquire()
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #print(port, port[10])
         inputSockets.append(sock)
-        #print(8000 + int(port[10]))
+        #print(8000+int(portSplit[3]))
         sock.bind(('127.0.0.1', 8000+int(portSplit[3])))
         #print("binded")
-        lock.release()
+        #lock.release()
 
 
     sendRequest(router)
@@ -145,10 +148,11 @@ def rip(router):
                         r = 2
                     outP = routers[(int(message[0][r]))-1].getOutputPorts()
                     for route in outP:
+                        print("routw", route)
                         #newOutPort = getOutputPortTo(routers[int(message[2]-1)])
                         #print("ruta", route)
-                        newOutPort = getOutputPortTo(router, routers[route[1] -1])
-                        newNumHops = min(int(route[2]) + int(getHopsTo(router, routers[route[2]])),  16)
+                        newOutPort = route[0]
+                        newNumHops = min(int(route[2]) + int(getHopsTo(router, routers[route[1] - 1])),  16)
                         route = Routes(router.getID(), route[1], newOutPort, newNumHops)
                         #print("ruta", route.dest, , route.numHops)
 
@@ -182,15 +186,15 @@ class myThread(threading.Thread):
         # threadLock.release()
 
 if __name__ == "__main__":
-    '''r = input("router?\n")
-    rip(routers[int(r)-1])'''
+    r = input("router?\n")
+    rip(routers[int(r)-1])
     #rip(r1)
     #rip(r2)
     #rip(r3)
     #rip(r4)
     #rip(r5)
 
-    t1 = myThread(r1)
+    '''t1 = myThread(r1)
     t2 = myThread(r2)
     t3 = myThread(r3)
     t4 = myThread(r4)
@@ -215,6 +219,6 @@ if __name__ == "__main__":
 
     #outsocket.close()
     #for soc in inputSockets:
-     #   soc.close()
+     #   soc.close()'''
 
 

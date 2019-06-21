@@ -37,11 +37,11 @@ class RoutingTable:
     def printTable(self):
         #self.routes.sort(self.routes.dest)
 
-        print("Dest\t| origen\t| Address\t| NumHops")
+        print("Dest\t| Address\t| NumHops")
         print("-------------------------------------------")
         for route in self.routes:
             if (route.numHops != 16):
                 formattednumHops = str(route.numHops)
             else:
                 formattednumHops = "inf"
-            print("{}\t| {}\t\t|  {}\t|  {}".format(route.dest, route.origen, route.address, formattednumHops))
+            print("{}\t|  {}\t|  {}".format(route.dest, route.address, formattednumHops))

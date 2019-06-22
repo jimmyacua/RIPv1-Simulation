@@ -8,6 +8,7 @@ class Router:
         self.outputPorts = outports
         self.routingTable = RoutingTable(id)
         self.neighbours = []
+        self.status = 1
 
     def getID(self):
         return self.routerID
@@ -29,3 +30,9 @@ class Router:
 
     def getInputPorts(self):
         return self.inputPorts
+
+    def shutdown(self):
+        self.status = 0
+
+    def getStatus(self):
+        return self.status
